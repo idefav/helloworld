@@ -49,6 +49,12 @@
                     <image>
                         <name>docker.io/idefav/${project.artifactId}</name>
                         <publish>false</publish>
+                        <image>
+                            <env>
+                                <HTTP_PROXY>http://192.168.10.108/</HTTP_PROXY>
+                                <HTTPS_PROXY>http://192.168.10.108/</HTTPS_PROXY>
+                            </env>
+                        </image>
                     </image>
                 </configuration>
             </plugin>
