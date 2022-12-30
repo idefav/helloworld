@@ -50,8 +50,8 @@
                         <name>docker.io/idefav/${project.artifactId}</name>
                         <publish>false</publish>
                         <env>
-                            <HTTP_PROXY>http://192.168.10.108/</HTTP_PROXY>
-                            <HTTPS_PROXY>http://192.168.10.108/</HTTPS_PROXY>
+                            <HTTP_PROXY>http://192.168.10.108:1082/</HTTP_PROXY>
+                            <HTTPS_PROXY>http://192.168.10.108:1082/</HTTPS_PROXY>
                         </env>
                     </image>
                 </configuration>
