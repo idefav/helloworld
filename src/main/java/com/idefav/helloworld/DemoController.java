@@ -11,6 +11,6 @@ public class DemoController {
 
     @GetMapping("/say/{name}")
     public String say(@PathVariable(name = "name") String name) {
-        return String.format("hello,%s", name);
+        return String.format("hello v1,%s", name);
     }
 }
