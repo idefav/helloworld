@@ -1,0 +1,17 @@
+apiVersion: tekton.dev/v1beta1
+kind: TaskRun
+metadata:
+  name: git-clone
+  namespace: default
+spec:
+  workspaces:
+    - name: output
+      emptyDir: {}
+  params:
+    - name: url
+      value: https://github.com/idefav/helloworld.git
+    - name: revision
+      value: master
+  taskRef:
+    name: git-clone
+

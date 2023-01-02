@@ -1,0 +1,213 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: maven-with-docker
+  labels:
+    app.kubernetes.io/version: "0.2"
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.12.1"
+    tekton.dev/categories: Build Tools
+    tekton.dev/tags: build-tool
+    tekton.dev/platforms: "linux/amd64,linux/s390x,linux/ppc64le"
+spec:
+  description: >-
+    This Task can be used to run a Maven build.
+
+  workspaces:
+    - name: source
+      description: The workspace consisting of maven project.
+    - name: maven-dependencies
+      mountPath: /root/.m2/
+    - name: maven-settings
+      description: >-
+        The workspace consisting of the custom maven settings
+        provided by the user.
+  params:
+    - name: MAVEN_IMAGE
+      type: string
+      description: Maven base image
+      default: gcr.io/cloud-builders/mvn@sha256:57523fc43394d6d9d2414ee8d1c85ed7a13460cbb268c3cd16d28cfb3859e641 #tag: latest
+    - name: GOALS
+      description: maven goals to run
+      type: array
+      default:
+        - "package"
+    - name: MAVEN_MIRROR_URL
+      description: The Maven repository mirror url
+      type: string
+      default: ""
+    - name: SERVER_USER
+      description: The username for the server
+      type: string
+      default: ""
+    - name: SERVER_PASSWORD
+      description: The password for the server
+      type: string
+      default: ""
+    - name: PROXY_USER
+      description: The username for the proxy server
+      type: string
+      default: ""
+    - name: PROXY_PASSWORD
+      description: The password for the proxy server
+      type: string
+      default: ""
+    - name: PROXY_PORT
+      description: Port number for the proxy server
+      type: string
+      default: ""
+    - name: PROXY_HOST
+      description: Proxy server Host
+      type: string
+      default: ""
+    - name: PROXY_NON_PROXY_HOSTS
+      description: Non proxy server host
+      type: string
+      default: ""
+    - name: PROXY_PROTOCOL
+      description: Protocol for the proxy ie http or https
+      type: string
+      default: "http"
+    - name: CONTEXT_DIR
+      type: string
+      description: >-
+        The context directory within the repository for sources on
+        which we want to execute maven goals.
+      default: "."
+    - name: insecure_registry
+      description: Allows the user to push to an insecure registry that has been specified
+      default: ""
+    - name: registry_mirror
+      description: Specific the docker registry mirror
+      default: ""
+  steps:
+    - name: mvn-settings
+      image: registry.access.redhat.com/ubi8/ubi-minimal:8.2
+      script: |
+        #!/usr/bin/env bash
+
+        [[ -f $(workspaces.maven-settings.path)/settings.xml ]] && \
+        echo 'using existing $(workspaces.maven-settings.path)/settings.xml' && exit 0
+
+        cat > $(workspaces.maven-settings.path)/settings.xml <<EOF
+        <settings>
+          <servers>
+            <!-- The servers added here are generated from environment variables. Don't change. -->
+            <!-- ### SERVER's USER INFO from ENV ### -->
+          </servers>
+          <mirrors>
+            <!-- The mirrors added here are generated from environment variables. Don't change. -->
+            <!-- ### mirrors from ENV ### -->
+          </mirrors>
+          <proxies>
+            <!-- The proxies added here are generated from environment variables. Don't change. -->
+            <!-- ### HTTP proxy from ENV ### -->
+          </proxies>
+        </settings>
+        EOF
+
+        xml=""
+        if [ -n "$(params.PROXY_HOST)" -a -n "$(params.PROXY_PORT)" ]; then
+          xml="<proxy>\
+            <id>genproxy</id>\
+            <active>true</active>\
+            <protocol>$(params.PROXY_PROTOCOL)</protocol>\
+            <host>$(params.PROXY_HOST)</host>\
+            <port>$(params.PROXY_PORT)</port>"
+          if [ -n "$(params.PROXY_USER)" -a -n "$(params.PROXY_PASSWORD)" ]; then
+            xml="$xml\
+                <username>$(params.PROXY_USER)</username>\
+                <password>$(params.PROXY_PASSWORD)</password>"
+          fi
+          if [ -n "$(params.PROXY_NON_PROXY_HOSTS)" ]; then
+            xml="$xml\
+                <nonProxyHosts>$(params.PROXY_NON_PROXY_HOSTS)</nonProxyHosts>"
+          fi
+          xml="$xml\
+              </proxy>"
+          sed -i "s|<!-- ### HTTP proxy from ENV ### -->|$xml|" $(workspaces.maven-settings.path)/settings.xml
+        fi
+
+        if [ -n "$(params.SERVER_USER)" -a -n "$(params.SERVER_PASSWORD)" ]; then
+          xml="<server>\
+            <id>serverid</id>"
+          xml="$xml\
+                <username>$(params.SERVER_USER)</username>\
+                <password>$(params.SERVER_PASSWORD)</password>"
+          xml="$xml\
+              </server>"
+          sed -i "s|<!-- ### SERVER's USER INFO from ENV ### -->|$xml|" $(workspaces.maven-settings.path)/settings.xml
+        fi
+
+        if [ -n "$(params.MAVEN_MIRROR_URL)" ]; then
+          xml="    <mirror>\
+            <id>mirror.default</id>\
+            <url>$(params.MAVEN_MIRROR_URL)</url>\
+            <mirrorOf>central</mirrorOf>\
+          </mirror>"
+          sed -i "s|<!-- ### mirrors from ENV ### -->|$xml|" $(workspaces.maven-settings.path)/settings.xml
+        fi
+
+    - name: mvn-goals
+      image: $(params.MAVEN_IMAGE)
+      env:
+        - name: DOCKER_HOST  # 用 TLS 形式通过 TCP 链接 sidecar
+          value: tcp://localhost:2376
+        - name: DOCKER_TLS_VERIFY  # 校验 TLS
+          value: '1'
+        - name: DOCKER_CERT_PATH  # 使用 sidecar 守护进程生成的证书
+          value: /certs/client
+        - name: HTTP_PROXY
+          value: http://192.168.10.108:1082/
+        - name: HTTPS_PROXY
+          value: http://192.168.10.108:1082/
+        - name: NO_PROXY
+          value: "localhost,127.0.0.1,10.96.0.0/12,10.244.0.0/16,192.168.10.0/24,1afnt6g3.mirror.aliyuncs.com,docker.io,registry.cn-hangzhou.aliyuncs.com,acs-cn-hangzhou-mirror.oss-cn-hangzhou.aliyuncs.com"
+      workingDir: $(workspaces.source.path)/$(params.CONTEXT_DIR)
+      script: |
+        #!/usr/bin/env bash
+        
+        export http_proxy=$HTTP_PROXY;https_proxy=$HTTPS_PROXY;no_proxy=$NO_PROXY
+        /usr/bin/mvn -s $(workspaces.maven-settings.path)/settings.xml $@
+#      command: ["/usr/bin/mvn"]
+      args:
+#        - -s
+#        - $(workspaces.maven-settings.path)/settings.xml
+        - "$(params.GOALS)"
+      volumeMounts:  # 声明挂载证书目录
+        - mountPath: /certs/client
+          name: dind-certs
+  sidecars:  # sidecar 模式，提供 docker daemon服务，实现真正的 DinD 模式
+    - image: docker:dind
+      name: server
+      args:
+        - --storage-driver=overlay2
+        - --userland-proxy=false
+        - --insecure-registry=$(params.insecure_registry)
+        - --registry-mirror=$(params.registry_mirror)
+      securityContext:
+        privileged: true
+      env:
+        - name: DOCKER_TLS_CERTDIR  # 将生成的证书写入与客户端共享的路径
+          value: /certs
+        - name: HTTP_PROXY
+          value: http://192.168.10.108:1082/
+        - name: HTTPS_PROXY
+          value: http://192.168.10.108:1082/
+        - name: NO_PROXY
+          value: "localhost,127.0.0.1,10.96.0.0/12,10.244.0.0/16,192.168.10.0/24,1afnt6g3.mirror.aliyuncs.com,docker.io,registry.cn-hangzhou.aliyuncs.com,acs-cn-hangzhou-mirror.oss-cn-hangzhou.aliyuncs.com"
+      volumeMounts:
+        - mountPath: /var/lib/docker
+          name: dind-storage
+        - mountPath: /certs/client
+          name: dind-certs
+      readinessProbe:  # 等待 dind daemon 生成它与客户端共享的证书
+        periodSeconds: 1
+        exec:
+          command: ['ls', '/certs/client/ca.pem']
+  volumes:  # 使用 emptyDir 的形式即可
+    - name: dind-certs
+      emptyDir: {}
+    - name: dind-storage
+      persistentVolumeClaim:
+        claimName: docker-cache-pvc

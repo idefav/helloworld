@@ -1,0 +1,55 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: helloworld-build-ppl
+spec:
+  workspaces:
+    - name: shared-workspace
+    - name: maven-settings
+    - name: maven-dependencies
+  tasks:
+    - name: fetch-repository
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+      params:
+        - name: url
+          value: https://github.com/idefav/helloworld.git
+        - name: subdirectory
+          value: ""
+        - name: deleteExisting
+          value: "true"
+        - name: revision
+          value: master
+        - name: httpProxy
+          value: http://192.168.10.108:1082/
+        - name: httpsProxy
+          value: http://192.168.10.108:1082/
+    - name: maven-with-docker-run
+      taskRef:
+        name: maven-with-docker
+      runAfter:
+        - fetch-repository
+      params:
+        - name: CONTEXT_DIR
+          value: "."
+        - name: GOALS
+          value:
+            - -Dspring-boot.build-image.builder=idefav/java-builder:base.3
+            - clean
+            - spring-boot:build-image
+        - name: MAVEN_MIRROR_URL
+          value: https://maven.aliyun.com/repository/public
+        - name: registry_mirror
+          value: https://1afnt6g3.mirror.aliyuncs.com
+        - name: insecure_registry
+          value: harbor.k8s.local
+      workspaces:
+        - name: maven-settings
+          workspace: maven-settings
+        - name: maven-dependencies
+          workspace: maven-dependencies
+        - name: source
+          workspace: shared-workspace

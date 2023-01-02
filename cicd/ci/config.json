@@ -1,0 +1,9 @@
+{
+  "auths": {
+    "https://index.docker.io/v1/": {
+      "username": "idefav",
+      "password": "dckr_pat_B9Bmo81TqEAnB05S32GdaOVh3w4",
+      "auth": "aWRlZmF2OmRja3JfcGF0X0I5Qm1vODFUcUVBbkIwNVMzMkdkYU9WaDN3NA=="
+    }
+  }
+}

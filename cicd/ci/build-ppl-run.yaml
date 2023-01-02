@@ -1,0 +1,24 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: hellowork-build-run3-20
+spec:
+  pipelineRef:
+    name: helloworld-build-ppl
+  workspaces:
+    - name: maven-settings
+      persistentvolumeclaim:
+        claimName: maven-source-pvc
+      subPath: m2
+    - name: maven-dependencies
+      persistentvolumeclaim:
+        claimName: maven-source-pvc
+      subPath: m2-dep
+    - name: shared-workspace
+      persistentvolumeclaim:
+        claimName: maven-source-pvc
+      subPath: src
+    - name: docker-cache
+      persistentvolumeclaim:
+        claimName: maven-source-pvc
+      subPath: docker/cache

@@ -1,0 +1,79 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: build-ppl-with-buildpacks
+spec:
+  workspaces:
+    - name: shared-workspace
+    - name: build-cache
+    - name: layers
+    - name: platform
+  params:
+    - name: repo
+      type: string
+      default: ""
+    - name: httpProxy
+      type: string
+    - name: httpsProxy
+      type: string
+    - name: appImage
+      type: string
+    - name: builderImage
+      type: string
+      default: idefav/java-builder:base.4
+    - name: sourceSubPath
+      type: string
+      default: ""
+    - name: envVars
+      type: array
+      default: []
+  tasks:
+    - name: fetch-repository
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+      params:
+        - name: url
+          value: $(params.repo)
+        - name: subdirectory
+          value: ""
+        - name: deleteExisting
+          value: "true"
+        - name: revision
+          value: master
+        - name: httpProxy
+          value: $(params.httpProxy)
+        - name: httpsProxy
+          value: $(params.httpsProxy)
+    - name: build-and-push
+      taskRef:
+        name: idefav-buildpacks
+      runAfter:
+        - fetch-repository
+      params:
+        - name: APP_IMAGE
+          value: $(params.appImage):$(context.pipelineRun.name)
+        - name: CACHE_IMAGE
+          value: $(params.appImage):cache
+        - name: BUILDER_IMAGE
+          value: $(params.builderImage)
+        - name: SOURCE_SUBPATH
+          value: $(params.sourceSubPath)
+        - name: ENV_VARS
+          value: $(params.envVars[*])
+        - name: registry_mirror
+          value: https://1afnt6g3.mirror.aliyuncs.com
+        - name: insecure_registry
+          value: harbor.k8s.local
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+        - name: cache
+          workspace: build-cache
+        - name: layers
+          workspace: layers
+        - name: platform
+          workspace: platform
+

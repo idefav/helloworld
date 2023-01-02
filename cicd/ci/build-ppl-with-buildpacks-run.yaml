@@ -1,0 +1,62 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: build-ppl-with-buildpacks-run2.15
+spec:
+  serviceAccountName: buildpacks-service-account2
+  pipelineRef:
+    name: build-ppl-with-buildpacks
+  params:
+    - name: repo
+      value: https://github.com/idefav/helloworld.git
+    - name: httpProxy
+      value: http://192.168.10.108:1082/
+    - name: httpsProxy
+      value: http://192.168.10.108:1082/
+    - name: appImage
+      value: idefav/helloworld
+    - name: envVars
+      value:
+        - BP_JVM_TYPE=JDK
+        - BP_JVM_VERSION=8
+        - SERVICE_BINDING_ROOT=/bindings
+        - HTTP_PROXY=http://192.168.10.108:1082/
+        - HTTPS_PROXY=http://192.168.10.108:1082/
+        - NO_PROXY=localhost,127.0.0.1,10.96.0.0/12,10.244.0.0/16,192.168.10.0/24,1afnt6g3.mirror.aliyuncs.com,docker.io,registry.cn-hangzhou.aliyuncs.com,acs-cn-hangzhou-mirror.oss-cn-hangzhou.aliyuncs.com
+  workspaces:
+    - name: shared-workspace
+      persistentvolumeclaim:
+        claimName: maven-source-pvc
+      subPath: src
+    - name: build-cache
+      persistentvolumeclaim:
+        claimName: maven-source-pvc
+      subPath: build/cache
+    - name: layers
+      emptyDir: {}
+    - name: platform
+      persistentvolumeclaim:
+        claimName: maven-source-pvc
+      subPath: platform
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dockerconfig-secret
+stringData:
+  config.json: |
+    {
+      "auths" : {
+        "https://index.docker.io/v1/" : {
+          "auth" : "idefav",
+          "identitytoken" : "dckr_pat_B9Bmo81TqEAnB05S32GdaOVh3w4"
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: buildpacks-service-account2
+secrets:
+  - name: docker-user-pass2

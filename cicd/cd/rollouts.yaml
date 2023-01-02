@@ -1,0 +1,29 @@
+apiVersion: rollouts.kruise.io/v1alpha1
+kind: Rollout
+metadata:
+  name: idefav-helloworld
+  # The rollout resource needs to be in the same namespace as the corresponding workload(deployment, cloneSet)
+  # namespace: xxxx
+spec:
+  objectRef:
+    # rollout of published workloads, currently only supports Deployment, CloneSet
+    workloadRef:
+      apiVersion: apps/v1
+      kind: Deployment
+      name: idefav-helloworld
+  strategy:
+    canary:
+      # canary published, e.g. 20%, 40%, 60% ...
+      steps:
+        # routing 5% traffics to the new version
+        - weight: 5
+          # Manual confirmation of the release of the remaining pods
+          pause: {}
+          # optional, The first step of released replicas. If not set, the default is to use 'weight', as shown above is 5%.
+          replicas: 20%
+      trafficRoutings:
+        # echoserver service name
+        - service: idefav-helloworld
+          # echoserver ingress name, current only nginx ingress
+          ingress:
+            name: idefav-helloworld
