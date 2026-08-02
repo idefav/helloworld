@@ -1,11 +1,6 @@
 package com.idefav.helloworld;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
-import java.time.format.ResolverStyle;
-import java.util.Locale;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -29,10 +24,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class TimeControllerTests {
 
-    private static final DateTimeFormatter STRICT_TIME_FORMATTER =
-            DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss", Locale.ROOT)
-                    .withResolverStyle(ResolverStyle.STRICT);
-
     @Autowired
     private MockMvc mockMvc;
 
@@ -40,7 +31,7 @@ class TimeControllerTests {
     private ObjectMapper objectMapper;
 
     @Test
-    void returnsCurrentUtcTimeInConfirmedFormat() throws Exception {
+    void returnsCurrentUtcTimeInRfc3339Format() throws Exception {
         Instant before = Instant.now();
         MvcResult result = mockMvc.perform(get("/time"))
                 .andExpect(status().isOk())
@@ -58,15 +49,10 @@ class TimeControllerTests {
 
         String value = timeNode.textValue();
         assertFalse(value.isEmpty());
-        assertEquals(19, value.length());
-        assertTrue(value.matches("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}"));
-        assertFalse(value.contains("T"));
-        assertFalse(value.contains("Z"));
-        assertFalse(value.contains("."));
-        assertFalse(value.matches(".*[+-]\\d{2}:?\\d{2}$"));
+        assertTrue(value.matches(
+                "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?Z"));
 
-        LocalDateTime parsed = LocalDateTime.parse(value, STRICT_TIME_FORMATTER);
-        Instant returned = parsed.toInstant(ZoneOffset.UTC);
+        Instant returned = Instant.parse(value);
         assertFalse(returned.isBefore(before.minusSeconds(1)));
         assertFalse(returned.isAfter(after.plusSeconds(1)));
     }
